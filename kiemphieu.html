@@ -948,6 +948,7 @@
             <!-- Kiểm tra từng phiếu -->
             <div class="phieu-details">
                 <h3>KIỂM TRA TỪNG PHIẾU</h3>
+                <button class="btn btn-success" style="float:right;" onclick="exportPhieuToExcel()">📥 Xuất Excel</button>
                 <div class="phieu-table-container" id="phieuTableContainer">
                     <!-- Bảng kiểm tra từng phiếu sẽ được tạo ở đây -->
                 </div>
@@ -979,6 +980,10 @@
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    // xuất excel 
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    
     <script>
         // Firebase config
         const firebaseConfig = { 
@@ -1686,6 +1691,87 @@
                 }
             });
         }
+        //xuất excel
+        async function exportPhieuToExcel() {
+        if (phieuDetails.length === 0) {
+            alert('Chưa có dữ liệu để xuất!');
+            return;
+        }
+    
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("KIỂM TRA TỪNG PHIẾU");
+    
+        // Tiêu đề
+        worksheet.mergeCells('A1', 'E1');
+        worksheet.getCell('A1').value = "BẢNG KIỂM TRA TỪNG PHIẾU";
+        worksheet.getCell('A1').font = { bold: true, size: 16 };
+        worksheet.getCell('A1').alignment = { horizontal: 'center' };
+        worksheet.addRow([]);
+    
+        // Dòng tiêu đề cột
+        const headers = ["Phiếu số", "Đọc phiếu", "Trạng thái"];
+        candidates.forEach(c => headers.push(`${c.stt}. ${c.name}`));
+        headers.push("Tổng", "Ghi chú");
+    
+        worksheet.addRow(headers);
+        const headerRow = worksheet.getRow(3);
+        headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: "FF2A5298" } };
+        headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    
+        // Dữ liệu từng phiếu
+        phieuDetails.forEach(phieu => {
+            const docPhieu = phieu.selectedStt ? phieu.selectedStt.sort((a, b) => a - b).join(' ') : '';
+            const rowData = [
+                phieu.phieuSo,
+                docPhieu,
+                phieu.trangThai
+            ];
+    
+            // Cột ứng viên
+            candidates.forEach(c => {
+                const isLoai = phieu.selectedIds.includes(c.id);
+                rowData.push(isLoai ? 0 : 1);
+            });
+    
+            rowData.push(candidates.length - phieu.selectedIds.length);
+            rowData.push("");
+            worksheet.addRow(rowData);
+        });
+    
+        // Tính tổng
+        const totals = ["TỔNG", "", ""];
+        candidates.forEach(c => {
+            let total = 0;
+            phieuDetails.forEach(p => {
+                if (!p.selectedIds.includes(c.id)) total++;
+            });
+            totals.push(total);
+        });
+        totals.push(
+            phieuDetails.reduce((sum, p) => sum + (candidates.length - p.selectedIds.length), 0),
+            ""
+        );
+        worksheet.addRow(totals);
+    
+        // Định dạng bảng
+        worksheet.columns.forEach(col => {
+            col.width = 18;
+            col.alignment = { vertical: 'middle', horizontal: 'center' };
+            col.border = {
+                top: { style: 'thin' },
+                bottom: { style: 'thin' },
+                left: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
+    
+        // Xuất file
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `KIEM_TRA_TUNG_PHIEU_${new Date().toISOString().slice(0,10)}.xlsx`);
+        alert("✅ Xuất file Excel thành công!");
+    }
+
 
         // Khởi chạy ứng dụng
         window.addEventListener('load', function() {
